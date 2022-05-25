@@ -1,0 +1,2 @@
+music21
+opencv-python-headless
