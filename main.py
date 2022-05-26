@@ -8,20 +8,30 @@ import cv2
 from music21 import note, stream, instrument, tempo, chord
 import numpy as np
 from numpy import random
+# import cv2
+import sys
 
-seed(48763)
-random.seed(12345)
+random_seed = 48763
+np_seed = 12345
+
+if len(sys.argv) >= 2:
+    random_seed = np_seed = int(sys.argv[1])
+    if len(sys.argv) >= 3:
+        np_seed = int(sys.argv[2])
+
+seed(random_seed)
+random.seed(np_seed)
 
 
 @dataclass
 class Config:
     indexes: List[int]
+    bpm: int
+    measure_count: int
 
 
-# TODO: Make it configurable
-config = Config(indexes=[0, 1, 0, 2])
-
-MEASURE_COUNT = 16
+# Make it configurable
+config = Config(indexes=[0, 1, 0, 2], measure_count=64)
 
 # piano chords
 C_maj = ['C4', 'E4', 'G4']
@@ -55,9 +65,10 @@ BASS_DRUM_PS = 35
 def gen_bass_drum(img_type: Literal['R', 'G', 'B']) -> stream.Part:
     bass_part = stream.Part()
     bass_part.insert(0, instrument.BassDrum())
-    measures = get_measures_by_type(img_type)
-    indexes = cycle(config.indexes)
-    for _ in range(MEASURE_COUNT):
+    for i in range(config.measure_count):
+        if i%8 == 0:
+            measures = get_measures_by_type(img_type)
+            indexes = cycle(config.indexes)
         for note in measures[next(indexes)]:
             bass_part.append(deepcopy(note))
     return bass_part
@@ -66,7 +77,7 @@ def gen_bass_drum(img_type: Literal['R', 'G', 'B']) -> stream.Part:
 def gen_snare_drum() -> stream.Part:
     snare_part = stream.Part()
     snare_part.insert(0, instrument.SnareDrum())
-    for _ in range(MEASURE_COUNT):
+    for _ in range(config.measure_count):
         snare_part.append(note.Rest())
         snare_part.append(note.Note(SNARE_DRUM_PS, quarterLength=1))
         snare_part.append(note.Rest())
@@ -76,7 +87,7 @@ def gen_snare_drum() -> stream.Part:
 
 def gen_chords() -> stream.Part:
     chords_part = stream.Part()
-    for _ in range(MEASURE_COUNT // 4):
+    for _ in range(config.measure_count // 4):
         chords_part.append(chord.Chord(C_maj, quarterLength=4))
         chords_part.append(chord.Chord(G_maj, quarterLength=4))
         chords_part.append(chord.Chord(F_maj, quarterLength=4))
@@ -89,10 +100,9 @@ def gen_melody(img_type: Literal['R', 'G', 'B']) -> stream.Part:
     melody_part.insert(0, instrument.Piano())
     note_p, rest_p = 6.5 / 8.0, 1.5 / 8.0
     prev_index = choice(range(len(melody_pitches)))
-    print(prev_index, melody_pitches[prev_index])
-    for _mc in range(MEASURE_COUNT):
+    for _mc in range(config.measure_count):
         for _n in range(8):
-            if (_mc % 8 == 7) and _n == 8 - 1:
+            if _mc == config.measure_count-1 and _n == 8-1:
                 melody_part.append(note.Note('C5', quarterLength=0.5))
                 continue
             rest_or_note = random.choice(['N', 'R'], p=[note_p, rest_p])
