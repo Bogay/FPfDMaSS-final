@@ -1,18 +1,16 @@
 from dataclasses import dataclass
 from itertools import cycle
 from random import choice, sample, seed, randint
+import sys
 from typing import List, Literal, Tuple, Optional
 from copy import deepcopy
+import cv2
 from music21 import note, stream, instrument, tempo, chord
+import numpy as np
 from numpy import random
-# import cv2
 
 seed(48763)
 random.seed(12345)
-
-# img = cv2.imread("rect.jpeg")
-# img = cv2.resize(img, (32, 32), interpolation=cv2.INTER_AREA)
-# cv2.imwrite('./preview.jpeg', img)
 
 
 @dataclass
@@ -20,7 +18,7 @@ class Config:
     indexes: List[int]
 
 
-# Make it configurable
+# TODO: Make it configurable
 config = Config(indexes=[0, 1, 0, 2])
 
 MEASURE_COUNT = 16
@@ -33,8 +31,20 @@ A_maj = ['A3', 'C4', 'E4']
 
 # piano pitch
 melody_pitches = [
-    'C5', 'D5', 'E5', 'F5', 'G5', 'A5', 'B5',
-    'C6', 'D6', 'E6', 'F6', 'G6', 'A6', 'B6',
+    'C5',
+    'D5',
+    'E5',
+    'F5',
+    'G5',
+    'A5',
+    'B5',
+    'C6',
+    'D6',
+    'E6',
+    'F6',
+    'G6',
+    'A6',
+    'B6',
 ]
 
 # percussion pitch
@@ -55,7 +65,6 @@ def gen_bass_drum(img_type: Literal['R', 'G', 'B']) -> stream.Part:
 
 def gen_snare_drum() -> stream.Part:
     snare_part = stream.Part()
-    snare_part.insert(tempo.MetronomeMark(number=180))
     snare_part.insert(0, instrument.SnareDrum())
     for _ in range(MEASURE_COUNT):
         snare_part.append(note.Rest())
@@ -65,7 +74,7 @@ def gen_snare_drum() -> stream.Part:
     return snare_part
 
 
-def gen_chords() -> stream.Part():
+def gen_chords() -> stream.Part:
     chords_part = stream.Part()
     for _ in range(MEASURE_COUNT // 4):
         chords_part.append(chord.Chord(C_maj, quarterLength=4))
@@ -78,19 +87,22 @@ def gen_chords() -> stream.Part():
 def gen_melody(img_type: Literal['R', 'G', 'B']) -> stream.Part:
     melody_part = stream.Part()
     melody_part.insert(0, instrument.Piano())
-    note_p, rest_p = 6.5/8.0, 1.5/8.0
+    note_p, rest_p = 6.5 / 8.0, 1.5 / 8.0
     prev_index = choice(range(len(melody_pitches)))
     print(prev_index, melody_pitches[prev_index])
     for _mc in range(MEASURE_COUNT):
         for _n in range(8):
-            if (_mc%8 == 7) and _n == 8-1:
+            if (_mc % 8 == 7) and _n == 8 - 1:
                 melody_part.append(note.Note('C5', quarterLength=0.5))
                 continue
             rest_or_note = random.choice(['N', 'R'], p=[note_p, rest_p])
             if rest_or_note == 'N':
-                melody_part.append(note.Note(melody_pitches[prev_index], quarterLength=0.5))
-                rg = range(max(0, prev_index-3), min(len(melody_pitches), prev_index+3))
-                pd = [0.1] + [0.8/(len(rg)-2) for _ in range(len(rg)-2)] + [0.1]
+                melody_part.append(
+                    note.Note(melody_pitches[prev_index], quarterLength=0.5))
+                rg = range(max(0, prev_index - 3),
+                           min(len(melody_pitches), prev_index + 3))
+                pd = [0.1] + [0.8 / (len(rg) - 2)
+                              for _ in range(len(rg) - 2)] + [0.1]
                 prev_index = random.choice(rg, p=pd)
             else:
                 melody_part.append(note.Rest(quarterLength=0.5))
@@ -133,7 +145,44 @@ def calculate_quarter_lengthes(k: int, total: int = 8) -> List[int]:
     return results
 
 
-s = stream.Stream()
-# TODO: determine type by input
-s.append([gen_bass_drum('B'), gen_snare_drum(), gen_chords(), gen_melody('B')])
-s.show()
+# ref: https://stackoverflow.com/questions/50313114/what-is-the-entropy-of-an-image-and-how-is-it-calculated
+def image_entropy(img: cv2.Mat) -> float:
+    marg = np.histogramdd(np.ravel(img), bins=256)[0] / img.size
+    marg = list(filter(lambda p: p > 0, np.ravel(marg)))
+    entropy = -np.sum(np.multiply(marg, np.log2(marg)))
+    return entropy
+
+
+def entropy_to_bpm(entropy: float) -> int:
+    MAX = 10
+    MIN = 0
+    entropy = np.clip(entropy, MIN, MAX)
+    MAX_BPM = 220
+    MIN_BPM = 70
+    return int(MIN_BPM + (MAX_BPM - MIN_BPM) * (entropy - MIN) / (MAX - MIN))
+
+
+def calculate_bpm(img_path: str) -> int:
+    img = cv2.imread(img_path)
+    entropy = image_entropy(img)
+    bpm = entropy_to_bpm(entropy)
+    return bpm
+
+
+if __name__ == '__main__':
+    try:
+        img_path = sys.argv[1]
+    except IndexError:
+        print(f'usage: python {__file__} [IMAGE PATH]')
+        exit(1)
+    s = stream.Stream()
+    # TODO: determine type by input
+    parts = [
+        gen_bass_drum('B'),
+        gen_snare_drum(),
+        gen_chords(),
+        gen_melody('B'),
+    ]
+    parts[0].insert(0, tempo.MetronomeMark(number=calculate_bpm(img_path)))
+    s.append(parts)
+    s.show()
