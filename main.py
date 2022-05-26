@@ -8,30 +8,20 @@ import cv2
 from music21 import note, stream, instrument, tempo, chord
 import numpy as np
 from numpy import random
-# import cv2
 import sys
 
-random_seed = 48763
-np_seed = 12345
-
-if len(sys.argv) >= 2:
-    random_seed = np_seed = int(sys.argv[1])
-    if len(sys.argv) >= 3:
-        np_seed = int(sys.argv[2])
-
-seed(random_seed)
-random.seed(np_seed)
+seed(48763)
+random.seed(12345)
 
 
 @dataclass
 class Config:
     indexes: List[int]
-    bpm: int
     measure_count: int
 
 
 # Make it configurable
-config = Config(indexes=[0, 1, 0, 2], measure_count=64)
+config = Config(indexes=[0, 1, 0, 2], measure_count=16)
 
 # piano chords
 C_maj = ['C4', 'E4', 'G4']
@@ -179,6 +169,21 @@ def calculate_bpm(img_path: str) -> int:
     return bpm
 
 
+def calculate_rgb_percentage(img: cv2.Mat) -> Tuple[float, float, float]:
+    r_p = np.sum(img[:, :, 0]) / img.size
+    g_p = np.sum(img[:, :, 1]) / img.size
+    b_p = np.sum(img[:, :, 2]) / img.size
+    return r_p, g_p, b_p
+
+
+def calculate_type(img_path: str) -> Literal['R', 'G', 'B']:
+    img = cv2.imread(img_path)
+    r, g, b = calculate_rgb_percentage(img)
+    print('r, g, b: ', r, g, b)
+    result = sorted([(r, 'R'), (g, 'G'), (b, 'B')], key=lambda x: x[0])[-1][1]
+    return result
+
+
 if __name__ == '__main__':
     try:
         img_path = sys.argv[1]
@@ -186,12 +191,13 @@ if __name__ == '__main__':
         print(f'usage: python {__file__} [IMAGE PATH]')
         exit(1)
     s = stream.Stream()
-    # TODO: determine type by input
+    type = calculate_type(img_path)
+    print('type: ', type)
     parts = [
-        gen_bass_drum('B'),
-        gen_snare_drum(),
+        gen_melody(type),
         gen_chords(),
-        gen_melody('B'),
+        gen_snare_drum(),
+        gen_bass_drum(type),
     ]
     parts[0].insert(0, tempo.MetronomeMark(number=calculate_bpm(img_path)))
     s.append(parts)
