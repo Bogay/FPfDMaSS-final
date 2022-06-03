@@ -1,14 +1,13 @@
+import sys
 from dataclasses import dataclass
 from itertools import cycle
 from random import choice, sample, seed, randint
-import sys
 from typing import List, Literal, Tuple, Optional
 from copy import deepcopy
 import cv2
-from music21 import note, stream, instrument, tempo, chord
 import numpy as np
+from music21 import note, stream, instrument, tempo, chord
 from numpy import random
-import sys
 
 seed(48763)
 random.seed(12345)
@@ -56,7 +55,7 @@ def gen_bass_drum(img_type: Literal['R', 'G', 'B']) -> stream.Part:
     bass_part = stream.Part()
     bass_part.insert(0, instrument.BassDrum())
     for i in range(config.measure_count):
-        if i%8 == 0:
+        if i % 8 == 0:
             measures = get_measures_by_type(img_type)
             indexes = cycle(config.indexes)
         for note in measures[next(indexes)]:
@@ -92,7 +91,7 @@ def gen_melody(img_type: Literal['R', 'G', 'B']) -> stream.Part:
     prev_index = choice(range(len(melody_pitches)))
     for _mc in range(config.measure_count):
         for _n in range(8):
-            if _mc == config.measure_count-1 and _n == 8-1:
+            if _mc == config.measure_count - 1 and _n == 8 - 1:
                 melody_part.append(note.Note('C5', quarterLength=0.5))
                 continue
             rest_or_note = random.choice(['N', 'R'], p=[note_p, rest_p])
@@ -188,7 +187,7 @@ if __name__ == '__main__':
     try:
         img_path = sys.argv[1]
     except IndexError:
-        print(f'usage: python {__file__} [IMAGE PATH]')
+        print(f'usage: python {__file__} <image_path>')
         exit(1)
     s = stream.Stream()
     type = calculate_type(img_path)
